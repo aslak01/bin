@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+if ! command -v svgo &> /dev/null; then
+    echo "SVGO is not installed. Please install it to use this function."
+    exit 1
+fi
+
+if ! command -v pbcopy &> /dev/null; then
+    echo "pbcopy is not installed or not available on this system. Please ensure it's installed to copy to clipboard."
+    exit 1
+fi
+
+if [ -z "$1" ] || [ ! -f "$1" ]; then
+    echo "No valid input file specified. Please provide a valid SVG file as an argument."
+    exit 1
+fi
+
+input=$1
+
+config_file="${HOME}/.config/svgo.config.js"
+if [ -f "$config_file" ]; then
+    svgo --config="$config_file" -i "$input" -o - | pbcopy
+else
+    svgo -i "$input" -o - | pbcopy
+fi
+
+echo "Optimized and copied $input (if you provided a valid file). Check clipboard."
