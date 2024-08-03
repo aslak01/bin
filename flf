@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+  echo "Usage: $0 <folder_path> [number_of_files]"
+  exit 1
+fi
+
+folder_path="$1"
+num_files="${2:-10}"  # Default to 10 if not provided
+
+find "$folder_path" -type f -exec du -h {} + 2>/dev/null | sort -rh | head -n "$num_files" | while read -r line; do
+
+  size=$(echo "$line" | awk '{print $1}')
+  file=$(echo "$line" | awk '{print $2}')
+
+  printf "\e[34m%s\e[0m\t%s\n" "$size" "$file"
+done

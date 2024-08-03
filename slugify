@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+    echo "No string provided. Please provide a string as an argument."
+    exit 1
+fi
+
+if ! command -v uni2ascii &> /dev/null; then
+    echo "uni2ascii is not installed or not available on this system. Please ensure it's installed to make ascii slugs."
+    exit 1
+fi
+
+slug=$(echo "$1" | \
+    uni2ascii -Bq | \
+    tr '[:upper:]' '[:lower:]' | \
+    tr -s '[:blank:]' | \
+    sed -e 's/ /-/g' -e 's/-\+/-/g'
+)
+
+echo "$slug"
