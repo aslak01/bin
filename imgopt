@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+for i in *."$1"; do
+    slugged=$(slugify ${i%.*})
+    if [ "$i" != "$slugged" ]; then
+        magick $i -resize 1920x1080 -quality 90 $slugged.jpg
+        rm $i
+    fi
+done

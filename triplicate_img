@@ -87,7 +87,7 @@ for SIZE in "${DIMENSIONS[@]}"; do
                 ((DIMENSIONINDEX++))
             done
 
-            echo $QUAL $SIZE
+            echo "resized $FILE $QUAL $SIZE"
             # Use ImageMagick to resize the image to the specified dimensions and save it to the compressed directory
             magick "${FILE}" -resize "${SIZE}^" -quality ${QUAL} -extent "${SIZE}" "${IMAGE_DIR}/compressed/${SLUG}_${LABEL}.${EXTENSION}"
         fi

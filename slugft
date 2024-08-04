@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+for file in *."$1"; do
+    filename=${file%.*}
+    newname="$(slugify $filename).$1"
+    mv "$file" "$newname"
+done
