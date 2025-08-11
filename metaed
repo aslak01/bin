@@ -1,0 +1,41 @@
+#!/bin/bash
+
+FILE="$1"
+EXT="${FILE##*.}"
+TEMP_META=$(mktemp)
+TEMP_VIDEO="${FILE%.*}_new.$EXT"
+
+echo "Extracting metadata..."
+ffmpeg -i "$FILE" -f ffmetadata - >"$TEMP_META" 2>/dev/null
+
+if [ ! -s "$TEMP_META" ]; then
+    cat >"$TEMP_META" <<'EOF'
+;FFMETADATA1
+title=Movie Title
+artist=Director Name
+album=Series Name
+date=2024
+comment=Description here
+genre=Action
+EOF
+fi
+
+$EDITOR "$TEMP_META"
+
+echo "Applying metadata..."
+success=$(ffmpeg -i "$FILE" -i "$TEMP_META" -map_metadata 1 -codec copy "$TEMP_VIDEO")
+
+if [ "$success" -eq 0 ]; then
+    echo "Success! New file: $TEMP_VIDEO"
+    echo "Replace original? (y/n)"
+    read -r answer
+    if [ "$answer" = "y" ]; then
+        mv "$TEMP_VIDEO" "$FILE"
+        echo "Original file updated"
+    fi
+else
+    echo "Error applying metadata"
+    rm -f "$TEMP_VIDEO"
+fi
+
+rm -f "$TEMP_META"
