@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
+shopt -s nullglob
+
 for i in *."$1"; do
-    slugged=$(slugify ${i%.*})
-    if [ "$i" != "$slugged" ]; then
-        magick $i -resize 1920x1080 -quality 90 $slugged.jpg
-        rm $i
+    slugged=$(slugify "${i%.*}")
+    output="$slugged.jpg"
+    if [ "$i" != "$output" ]; then
+        magick "$i" -resize 1920x1080 -quality 90 "$output"
+        rm "$i"
     fi
 done

@@ -1,6 +1,17 @@
 #!/bin/bash
 
 FILE="$1"
+
+if [ -z "$FILE" ]; then
+    echo "Usage: $(basename "$0") <video>" >&2
+    exit 1
+fi
+
+if [ ! -f "$FILE" ]; then
+    echo "Error: File '$FILE' not found" >&2
+    exit 1
+fi
+
 EXT="${FILE##*.}"
 TEMP_META=$(mktemp)
 TEMP_VIDEO="${FILE%.*}_new.$EXT"
@@ -23,9 +34,7 @@ fi
 $EDITOR "$TEMP_META"
 
 echo "Applying metadata..."
-success=$(ffmpeg -i "$FILE" -i "$TEMP_META" -map_metadata 1 -codec copy "$TEMP_VIDEO")
-
-if [ "$success" -eq 0 ]; then
+if ffmpeg -i "$FILE" -i "$TEMP_META" -map_metadata 1 -codec copy "$TEMP_VIDEO"; then
     echo "Success! New file: $TEMP_VIDEO"
     echo "Replace original? (y/n)"
     read -r answer
