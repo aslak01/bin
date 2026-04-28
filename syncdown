@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+if [[ -z "$1" ]]; then
+  echo "Usage: $(basename "$0") <source>" >&2
+  exit 1
+fi
+
+host="${1%%:*}"
+remote="${1#*:}"
+rsync -avz --files-from=<(ssh "$host" "cd '$remote' && git ls-files") "$1/" ./

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+if [[ -z "$1" ]]; then
+  echo "Usage: $(basename "$0") <image>" >&2
+  exit 1
+fi
+
+if [[ ! -f "$1" ]]; then
+  echo "Error: File '$1' not found" >&2
+  exit 1
+fi
+
+filepath=$(realpath "$1")
+osascript -e "set the clipboard to (read (POSIX file \"$filepath\") as picture)"

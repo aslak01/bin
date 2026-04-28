@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+if [[ -z "$1" ]]; then
+  echo "Usage: $(basename "$0") <filepath>" >&2
+  exit 1
+fi
+
+filepath="$1"
+
+if [[ "$filepath" != /* ]]; then
+  filepath="$(pwd)/$filepath"
+fi
+
+if [[ ! -e "$filepath" ]]; then
+  echo "Error: File does not exist: $filepath" >&2
+  exit 1
+fi
+
+osascript -e "set the clipboard to (POSIX file \"$filepath\")" &&
+  echo "✓ Copied to clipboard: $filepath"
