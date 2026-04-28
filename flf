@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <folder_path> [number_of_files]"
+  echo "Usage: $(basename "$0") <folder_path> [number_of_files]" >&2
+  echo "List largest files in a folder." >&2
   exit 1
 fi
 

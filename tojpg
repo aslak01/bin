@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 
-if ! command -v magick &> /dev/null; then
-    echo "ImageMagick is not installed. Please install it to use this script."
+if [ -z "$1" ]; then
+    echo "Usage: $(basename "$0") <image>" >&2
+    echo "Convert an image to JPG." >&2
     exit 1
 fi
 
-if [ -z "$1" ] || [ ! -f "$1" ]; then
-    echo "No valid input file specified. Please provide a valid image file as an argument."
+if [ ! -f "$1" ]; then
+    echo "Error: File '$1' not found" >&2
+    exit 1
+fi
+
+if ! command -v magick &> /dev/null; then
+    echo "ImageMagick is not installed. Please install it to use this script." >&2
     exit 1
 fi
 

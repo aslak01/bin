@@ -2,6 +2,7 @@
 
 if [[ -z "$1" ]]; then
   echo "Usage: $(basename "$0") <filepath>" >&2
+  echo "Copy a file reference to the macOS clipboard." >&2
   exit 1
 fi
 

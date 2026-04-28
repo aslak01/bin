@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 
+if [ -z "$1" ]; then
+    echo "Usage: $(basename "$0") <svg>" >&2
+    echo "Optimise an SVG and copy the result to the clipboard." >&2
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "Error: File '$1' not found" >&2
+    exit 1
+fi
+
 if ! command -v svgo &> /dev/null; then
-    echo "SVGO is not installed. Please install it to use this function."
+    echo "SVGO is not installed. Please install it to use this script." >&2
     exit 1
 fi
 
 if ! command -v pbcopy &> /dev/null; then
-    echo "pbcopy is not installed or not available on this system. Please ensure it's installed to copy to clipboard."
-    exit 1
-fi
-
-if [ -z "$1" ] || [ ! -f "$1" ]; then
-    echo "No valid input file specified. Please provide a valid SVG file as an argument."
+    echo "pbcopy is not installed or not available on this system. Please ensure it's installed to copy to clipboard." >&2
     exit 1
 fi
 

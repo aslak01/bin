@@ -2,6 +2,7 @@
 
 if [ -z "$1" ]; then
     echo "Usage: $(basename "$0") <extension>" >&2
+    echo "Slugify filenames of a given extension." >&2
     exit 1
 fi
 

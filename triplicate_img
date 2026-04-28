@@ -1,33 +1,18 @@
 #!/usr/bin/env bash
 
 display_help() {
-    echo "Usage: $0 IMAGE_DIR [small|medium|large] [QUALITY]"
-    echo
-    echo "Arguments:"
-    echo "  IMAGE_DIR     The directory containing images to be compressed."
-    echo "  [size]        (Optional) Specify the size category: small, medium, or large."
-    echo "                Defaults to 'medium' if not specified."
-    echo "  [QUALITY]     (Optional) Specify the image quality (1-100). Defaults to 90."
-    echo
-    echo "Example:"
-    echo "  $0 /path/to/images medium 80"
+    echo "Usage: $(basename "$0") <image_dir> [small|medium|large] [quality]" >&2
+    echo "Generate three downscaled copies of each image in a directory." >&2
     exit 1
 }
 
+if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
+    display_help
+fi
+
 if ! command -v magick &>/dev/null; then
-    echo "ImageMagick is not installed. Please install it to use this script."
+    echo "ImageMagick is not installed. Please install it to use this script." >&2
     exit 1
-fi
-
-# Check for help option
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    display_help
-fi
-
-# Ensure at least one argument is provided
-if [ -z "$1" ]; then
-    echo "Error: IMAGE_DIR is required."
-    display_help
 fi
 
 IMAGE_DIR="$1"
