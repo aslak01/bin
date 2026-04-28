@@ -10,11 +10,6 @@ if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
     display_help
 fi
 
-if ! command -v magick &>/dev/null; then
-    echo "ImageMagick is not installed. Please install it to use this script." >&2
-    exit 1
-fi
-
 IMAGE_DIR="$1"
 
 # Define the three default dimensions to which the images should be compressed
@@ -50,22 +45,31 @@ LABELS=(lg md sm)
 for IDX in "${!DIMENSIONS[@]}"; do
     SIZE="${DIMENSIONS[$IDX]}"
     LABEL="${LABELS[$IDX]}"
-    # Loop through the images in the directory
+    TARGET_W="${SIZE%x*}"
+    TARGET_H="${SIZE#*x}"
     for FILE in "${IMAGE_DIR}"/*.*; do
-        # Get the file extension
         EXTENSION="${FILE##*.}"
+        if [[ "$EXTENSION" =~ ^(jpg|jpeg|png|gif|avif|webp|heic|heif|tiff|tif|bmp)$ ]]; then
+            SLUG="$(slugify "$(basename "${FILE%.*}")")"
+            OUT="${IMAGE_DIR}/compressed/${SLUG}_${LABEL}.jpg"
 
-        # Check if the file is an image
-        if [[ "$EXTENSION" =~ ^(jpg|jpeg|png|gif|avif|webp)$ ]]; then
-            # Get the file name without the extension
-            FILENAME="${FILE%.*}"
-
-            # Convert the file name to a slug
-            SLUG="$(slugify "$(basename "${FILENAME}")")"
+            # Cover-scale: pick the scale that makes both sides >= target, then crop center.
+            read -r NEW_W NEW_H < <(sips -g pixelWidth -g pixelHeight "$FILE" 2>/dev/null \
+                | awk -v tw="$TARGET_W" -v th="$TARGET_H" '
+                    /pixelWidth:/  { sw = $2 }
+                    /pixelHeight:/ { sh = $2 }
+                    END {
+                        if (!sw || !sh) exit 1
+                        sx = tw / sw; sy = th / sh
+                        s  = (sx > sy) ? sx : sy
+                        printf "%d %d\n", int(sw * s + 0.5), int(sh * s + 0.5)
+                    }')
+            [ -z "$NEW_W" ] && { echo "skipped (no dims): $FILE" >&2; continue; }
 
             echo "resized $FILE $QUAL $SIZE"
-            # Use ImageMagick to resize the image to the specified dimensions and save it to the compressed directory
-            magick "${FILE}" -resize "${SIZE}^" -quality "${QUAL}" -extent "${SIZE}" "${IMAGE_DIR}/compressed/${SLUG}_${LABEL}.${EXTENSION}"
+            sips -z "$NEW_H" "$NEW_W" -c "$TARGET_H" "$TARGET_W" \
+                -s format jpeg -s formatOptions "$QUAL" \
+                "$FILE" --out "$OUT" >/dev/null
         fi
     done
 done

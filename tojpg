@@ -11,15 +11,27 @@ if [ ! -f "$1" ]; then
     exit 1
 fi
 
-if ! command -v magick &> /dev/null; then
-    echo "ImageMagick is not installed. Please install it to use this script." >&2
-    exit 1
-fi
-
 input_file="$1"
 output_file="${input_file%.*}.jpg"
 
-if magick "$input_file" "$output_file"; then
+ext=$(printf '%s' "${input_file##*.}" | tr '[:upper:]' '[:lower:]')
+if [ "$ext" = "svg" ]; then
+    if ! command -v rsvg-convert &>/dev/null; then
+        echo "Error: rsvg-convert not installed (brew install librsvg)" >&2
+        exit 1
+    fi
+    tmp_dir=$(mktemp -d -t tojpg)
+    trap 'rm -rf "$tmp_dir"' EXIT
+    src="$tmp_dir/img.png"
+    if ! rsvg-convert -f png "$input_file" -o "$src"; then
+        echo "Conversion failed for: $input_file" >&2
+        exit 1
+    fi
+else
+    src="$input_file"
+fi
+
+if sips -s format jpeg "$src" --out "$output_file" >/dev/null; then
     echo "Conversion successful: $output_file"
 else
     echo "Conversion failed for: $input_file" >&2

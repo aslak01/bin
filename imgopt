@@ -6,18 +6,13 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-if ! command -v magick &>/dev/null; then
-    echo "ImageMagick is not installed. Please install it to use this script." >&2
-    exit 1
-fi
-
 shopt -s nullglob
 
 for i in *."$1"; do
     slugged=$(slugify "${i%.*}")
     output="$slugged.jpg"
     if [ "$i" != "$output" ]; then
-        if magick "$i" -resize 1920x1080 -quality 90 "$output"; then
+        if sips -Z 1920 -s format jpeg -s formatOptions 90 "$i" --out "$output" >/dev/null; then
             rm "$i"
         fi
     fi
