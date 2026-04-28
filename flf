@@ -8,6 +8,11 @@ fi
 folder_path="$1"
 num_files="${2:-10}"  # Default to 10 if not provided
 
+if ! [[ "$num_files" =~ ^[0-9]+$ ]]; then
+  echo "Error: number_of_files must be a positive integer" >&2
+  exit 1
+fi
+
 find "$folder_path" -type f -exec du -h {} + 2>/dev/null | sort -rh | head -n "$num_files" | while IFS=$'\t' read -r size file; do
   printf "\e[34m%s\e[0m\t%s\n" "$size" "$file"
 done

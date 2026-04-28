@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 
+if [ -z "$1" ]; then
+    echo "Usage: $(basename "$0") <extension>" >&2
+    exit 1
+fi
+
+shopt -s nullglob
+
 for file in *."$1"; do
     filename=${file%.*}
-    newname="$(slugify $filename).$1"
-    mv "$file" "$newname"
+    newname="$(slugify "$filename").$1"
+    if [ "$file" != "$newname" ]; then
+        mv "$file" "$newname"
+    fi
 done

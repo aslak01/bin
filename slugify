@@ -13,8 +13,7 @@ fi
 slug=$(echo "$1" | \
     uni2ascii -Bq | \
     tr '[:upper:]' '[:lower:]' | \
-    tr -s '[:blank:]' | \
-    sed -e 's/ /-/g' -e 's/-\+/-/g'
+    sed -e 's/[[:space:]]\+/-/g' -e 's/-\+/-/g'
 )
 
 echo "$slug"

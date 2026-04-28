@@ -7,4 +7,6 @@ fi
 
 host="${1%%:*}"
 remote="${1#*:}"
-rsync -avz --files-from=<(ssh "$host" "cd '$remote' && git ls-files") "$1/" ./
+remote_q=$(printf %q "$remote")
+# shellcheck disable=SC2029  # $remote_q is intentionally pre-quoted for remote shell
+rsync -avz --files-from=<(ssh "$host" "cd $remote_q && git ls-files") "$1/" ./

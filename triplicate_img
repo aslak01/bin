@@ -57,10 +57,14 @@ else
 fi
 
 # Create the compressed directory if it doesn't exist
-mkdir -p ${IMAGE_DIR}/compressed
+mkdir -p "${IMAGE_DIR}/compressed"
+
+LABELS=(lg md sm)
 
 # Loop through the dimensions and compress the images
-for SIZE in "${DIMENSIONS[@]}"; do
+for IDX in "${!DIMENSIONS[@]}"; do
+    SIZE="${DIMENSIONS[$IDX]}"
+    LABEL="${LABELS[$IDX]}"
     # Loop through the images in the directory
     for FILE in "${IMAGE_DIR}"/*.*; do
         # Get the file extension
@@ -73,23 +77,10 @@ for SIZE in "${DIMENSIONS[@]}"; do
 
             # Convert the file name to a slug
             SLUG="$(slugify "$(basename "${FILENAME}")")"
-            DIMENSIONINDEX=0
-            for I in "${DIMENSIONS[@]}"; do
-                if [[ "${I}" == "${SIZE}" ]]; then
-                    if [[ "${DIMENSIONINDEX}" == "0" ]]; then
-                        LABEL="lg"
-                    elif [[ "${DIMENSIONINDEX}" == "1" ]]; then
-                        LABEL="md"
-                    else
-                        LABEL="sm"
-                    fi
-                fi
-                ((DIMENSIONINDEX++))
-            done
 
             echo "resized $FILE $QUAL $SIZE"
             # Use ImageMagick to resize the image to the specified dimensions and save it to the compressed directory
-            magick "${FILE}" -resize "${SIZE}^" -quality ${QUAL} -extent "${SIZE}" "${IMAGE_DIR}/compressed/${SLUG}_${LABEL}.${EXTENSION}"
+            magick "${FILE}" -resize "${SIZE}^" -quality "${QUAL}" -extent "${SIZE}" "${IMAGE_DIR}/compressed/${SLUG}_${LABEL}.${EXTENSION}"
         fi
     done
 done

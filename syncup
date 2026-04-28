@@ -5,4 +5,9 @@ if [[ -z "$1" ]]; then
   exit 1
 fi
 
+if [[ "$1" != *:* ]]; then
+  echo "Error: destination must be in host:path format" >&2
+  exit 1
+fi
+
 rsync -avz --rsync-path="mkdir -p ${1#*:} && rsync" --files-from=<(git ls-files) ./ "$1"

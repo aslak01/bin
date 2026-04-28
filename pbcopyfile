@@ -16,5 +16,7 @@ if [[ ! -e "$filepath" ]]; then
   exit 1
 fi
 
-osascript -e "set the clipboard to (POSIX file \"$filepath\")" &&
+escaped=${filepath//\\/\\\\}
+escaped=${escaped//\"/\\\"}
+osascript -e "set the clipboard to (POSIX file \"$escaped\")" &&
   echo "✓ Copied to clipboard: $filepath"

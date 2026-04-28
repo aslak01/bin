@@ -11,4 +11,6 @@ if [[ ! -f "$1" ]]; then
 fi
 
 filepath=$(realpath "$1")
-osascript -e "set the clipboard to (read (POSIX file \"$filepath\") as picture)"
+escaped=${filepath//\\/\\\\}
+escaped=${escaped//\"/\\\"}
+osascript -e "set the clipboard to (read (POSIX file \"$escaped\") as picture)"

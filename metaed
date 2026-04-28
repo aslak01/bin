@@ -31,7 +31,7 @@ genre=Action
 EOF
 fi
 
-$EDITOR "$TEMP_META"
+"${EDITOR:-vi}" "$TEMP_META"
 
 echo "Applying metadata..."
 if ffmpeg -i "$FILE" -i "$TEMP_META" -map_metadata 1 -codec copy "$TEMP_VIDEO"; then
