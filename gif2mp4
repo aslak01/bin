@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $(basename "$0") <input.gif> <output.mp4>" >&2
+    echo "Convert a GIF to an MP4 with even dimensions and faststart." >&2
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "Error: File '$1' not found" >&2
+    exit 1
+fi
+
+if ! command -v ffmpeg &>/dev/null; then
+    echo "Error: ffmpeg not installed (brew install ffmpeg)" >&2
+    exit 1
+fi
+
+ffmpeg -i "$1" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "$2"

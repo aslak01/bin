@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $(basename "$0") <input> <output>" >&2
+    echo "Re-encode a video to fit under ~8MB using two-pass H.264/AAC." >&2
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "Error: File '$1' not found" >&2
+    exit 1
+fi
+
+if ! command -v ffmpeg &>/dev/null || ! command -v ffprobe &>/dev/null; then
+    echo "Error: ffmpeg/ffprobe not installed (brew install ffmpeg)" >&2
+    exit 1
+fi
+
+input="$1"
+output="$2"
+
+length=$(ffprobe -i "$input" -show_entries format=duration -v quiet -of csv="p=0")
+mins=$(awk -v var1="$length" -v var2=60 'BEGIN { print ( var1 / var2 ) }')
+bitrate=$(awk -v var1=1020 -v var2="$mins" 'BEGIN { print ( var1 / var2 ) }')
+bitrateOver=$(awk -v var1="$bitrate" 'BEGIN { print ( var1 * 0.94 ) }')
+bitrateVid=$(awk -v var1="$bitrateOver" 'BEGIN { print ( var1 - 64 ) }')
+bitrateAudio=64
+
+ffmpeg -i "$input" -an -c:v libx264 -b:v "${bitrateVid}k" -preset fast -pass 1 -f null /dev/null
+ffmpeg -i "$input" -c:a aac -aac_coder twoloop -b:a "${bitrateAudio}k" -c:v libx264 -b:v "${bitrateVid}k" -preset fast -pass 2 "$output"
