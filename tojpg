@@ -1,39 +1,72 @@
 #!/usr/bin/env bash
 
-if [ -z "$1" ]; then
-    echo "Usage: $(basename "$0") <image>" >&2
-    echo "Convert an image to JPG." >&2
+remove_originals=0
+files=()
+for arg in "$@"; do
+    case "$arg" in
+        -rm|--remove-originals) remove_originals=1 ;;
+        *) files+=("$arg") ;;
+    esac
+done
+
+if [ ${#files[@]} -eq 0 ]; then
+    echo "Usage: $(basename "$0") [-rm|--remove-originals] <image>..." >&2
+    echo "Convert images to JPG." >&2
     exit 1
 fi
 
-if [ ! -f "$1" ]; then
-    echo "Error: File '$1' not found" >&2
+if command -v sips &>/dev/null; then
+    to_jpeg() { sips -s format jpeg "$1" --out "$2" >/dev/null; }
+elif command -v magick &>/dev/null; then
+    to_jpeg() { magick "$1" "$2"; }
+elif command -v convert &>/dev/null; then
+    to_jpeg() { convert "$1" "$2"; }
+else
+    echo "Error: no converter found (need sips or ImageMagick)" >&2
     exit 1
 fi
 
-input_file="$1"
-output_file="${input_file%.*}.jpg"
+tmp_dir=""
+trap '[ -n "$tmp_dir" ] && rm -rf "$tmp_dir"' EXIT
 
-ext=$(printf '%s' "${input_file##*.}" | tr '[:upper:]' '[:lower:]')
-if [ "$ext" = "svg" ]; then
-    if ! command -v rsvg-convert &>/dev/null; then
-        echo "Error: rsvg-convert not installed (brew install librsvg)" >&2
-        exit 1
+failed=0
+
+for input_file in "${files[@]}"; do
+    if [ ! -f "$input_file" ]; then
+        echo "Error: File '$input_file' not found" >&2
+        failed=1
+        continue
     fi
-    tmp_dir=$(mktemp -d -t tojpg)
-    trap 'rm -rf "$tmp_dir"' EXIT
-    src="$tmp_dir/img.png"
-    if ! rsvg-convert -f png "$input_file" -o "$src"; then
+
+    output_file="${input_file%.*}.jpg"
+
+    ext=$(printf '%s' "${input_file##*.}" | tr '[:upper:]' '[:lower:]')
+    if [ "$ext" = "svg" ]; then
+        if ! command -v rsvg-convert &>/dev/null; then
+            echo "Error: rsvg-convert not installed (brew install librsvg)" >&2
+            failed=1
+            continue
+        fi
+        [ -z "$tmp_dir" ] && tmp_dir=$(mktemp -d -t tojpg)
+        src="$tmp_dir/img.png"
+        if ! rsvg-convert -f png "$input_file" -o "$src"; then
+            echo "Conversion failed for: $input_file" >&2
+            failed=1
+            continue
+        fi
+    else
+        src="$input_file"
+    fi
+
+    if to_jpeg "$src" "$output_file"; then
+        echo "Conversion successful: $output_file"
+        if [ "$remove_originals" = 1 ] && [ "$input_file" != "$output_file" ]; then
+            rm -- "$input_file"
+        fi
+    else
         echo "Conversion failed for: $input_file" >&2
-        exit 1
+        failed=1
     fi
-else
-    src="$input_file"
-fi
+done
 
-if sips -s format jpeg "$src" --out "$output_file" >/dev/null; then
-    echo "Conversion successful: $output_file"
-else
-    echo "Conversion failed for: $input_file" >&2
-    exit 1
-fi
+exit $failed
