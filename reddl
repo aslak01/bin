@@ -26,7 +26,8 @@ else
     old_url="$url"
 fi
 
-page=$(curl -fsSL -A "$ua" -e "https://old.reddit.com/" "$old_url")
+# over18=1 skips the NSFW age-gate interstitial, which has no post data
+page=$(curl -fsSL -A "$ua" -e "https://old.reddit.com/" -b "over18=1" "$old_url")
 
 # Extract title from og:title — deterministic, one per HTML document.
 # macOS grep has no -P, so use -E and finish the extraction with sed; the
