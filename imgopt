@@ -12,7 +12,7 @@ for i in *."$1"; do
     slugged=$(slugify "${i%.*}")
     output="$slugged.jpg"
     if [ "$i" != "$output" ]; then
-        if sips -Z 1920 -s format jpeg -s formatOptions 90 "$i" --out "$output" >/dev/null; then
+        if sips -Z 1200 -s format jpeg -s formatOptions 90 "$i" --out "$output" >/dev/null; then
             rm "$i"
         fi
     fi

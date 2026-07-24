@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if [ -z "$1" ]; then
+if [ $# -eq 0 ]; then
     echo "Usage: $(basename "$0") <string>" >&2
     echo "Convert a string to an ASCII slug." >&2
     exit 1
@@ -10,5 +10,5 @@ printf '%s' "$1" \
     | iconv -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null \
     | tr -d '"`^~'\''' \
     | tr '[:upper:]' '[:lower:]' \
-    | sed -E -e 's/[[:space:]]+/-/g' -e 's/-+/-/g' -e 's/^-|-$//g'
+    | sed -E -e 's/[^a-z0-9]+/-/g' -e 's/^-|-$//g'
 echo

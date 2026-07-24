@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ -z "${1:-}" ]; then
+    echo "Usage: $(basename "$0") <reddit-post-url>" >&2
+    echo "Download a Reddit image in its source format to ~/Pictures, named after the post title." >&2
+    exit 1
+fi
+
+url="$1"
+ua="Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+
+# Decode HTML entities from attribute values; &amp; must come last so
+# double-escaped entities don't get decoded twice
+unescape() {
+    sed 's/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g; s/&#39;/'\''/g; s/&amp;/\&/g'
+}
+
+# Fetch old.reddit.com — it has all post data in the initial HTML,
+# unlike new.reddit.com which is JS-rendered and stripped of media data
+if echo "$url" | grep -q "/comments/"; then
+    # Use sed to replace only the domain portion
+    old_url=$(echo "$url" | sed 's|^https\{0,1\}://www\.reddit\.com|https://old.reddit.com|;s|^https\{0,1\}://reddit\.com|https://old.reddit.com|')
+else
+    old_url="$url"
+fi
+
+page=$(curl -fsSL -A "$ua" -e "https://old.reddit.com/" "$old_url")
+
+# Extract title from og:title — deterministic, one per HTML document.
+# macOS grep has no -P, so use -E and finish the extraction with sed; the
+# || true keeps a no-match grep from tripping errexit before our own checks.
+title=$(echo "$page" | grep -oE 'property="og:title"[^>]*content="[^"]*"' | head -1 | sed 's/.*content="//;s/"$//' | unescape || true)
+
+if [ -z "$title" ]; then
+    echo "Could not extract post title" >&2
+    exit 1
+fi
+
+post_id=$(echo "$url" | sed -n 's|.*/comments/\([a-zA-Z0-9]*\).*|\1|p')
+
+if [ -z "$post_id" ]; then
+    echo "Could not extract post ID from URL" >&2
+    exit 1
+fi
+
+# Extract image URL from data-url attribute on the post element
+# This is the original uploaded image, deterministic per post
+img_url=$(echo "$page" | grep -oE "id=\"thing_t3_${post_id}\"[^>]*data-url=\"[^\"]*\"" | head -1 | sed 's/.*data-url="//;s/"$//' || true)
+
+if [ -z "$img_url" ]; then
+    # Fallback: the thumbnail anchor's href points at the full-size media
+    # (never the <img> src — that's a downscaled thumbnail)
+    img_url=$(echo "$page" | grep -oE '<a [^>]*>' | grep 'class="thumbnail' | head -1 | sed -n 's/.*href="\([^"]*\)".*/\1/p' || true)
+fi
+
+if [ -z "$img_url" ]; then
+    echo "Could not find image URL for post" >&2
+    exit 1
+fi
+
+img_url=$(echo "$img_url" | unescape)
+
+# preview.redd.it serves resized copies; the same path on i.redd.it is the
+# original upload, and the sizing/signature params don't apply over there
+case "$img_url" in
+*preview.redd.it*)
+    img_url="${img_url%%\?*}"
+    img_url="${img_url/preview.redd.it/i.redd.it}"
+    ;;
+esac
+
+ext="${img_url%%\?*}"
+ext="${ext##*.}"
+case "$ext" in
+jpg | jpeg | png | gif | webp) ;;
+*)
+    echo "Post does not link to a direct image: $img_url" >&2
+    exit 1
+    ;;
+esac
+
+# slugify handles unicode transliteration; strip any " - r/sub" suffix first
+slug=$(slugify "${title%% - r/*}")
+if [ -z "$slug" ]; then
+    slug="$post_id"
+fi
+
+output="$HOME/Pictures/${slug}.${ext}"
+# Don't clobber an existing file from a different post with the same title
+if [ -e "$output" ]; then
+    output="$HOME/Pictures/${slug}-${post_id}.${ext}"
+fi
+
+mkdir -p "$HOME/Pictures"
+curl -fsSL -A "$ua" -e "https://www.reddit.com/" -o "$output" "$img_url"
+
+echo "$output"
