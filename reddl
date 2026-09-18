@@ -8,36 +8,13 @@ if [ -z "${1:-}" ]; then
     exit 1
 fi
 
-url="$1"
-ua="Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
-
-# Decode HTML entities from attribute values; &amp; must come last so
-# double-escaped entities don't get decoded twice
-unescape() {
-    sed 's/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g; s/&#39;/'\''/g; s/&amp;/\&/g'
-}
-
-# Fetch old.reddit.com — it has all post data in the initial HTML,
-# unlike new.reddit.com which is JS-rendered and stripped of media data
-if echo "$url" | grep -q "/comments/"; then
-    # Use sed to replace only the domain portion
-    old_url=$(echo "$url" | sed 's|^https\{0,1\}://www\.reddit\.com|https://old.reddit.com|;s|^https\{0,1\}://reddit\.com|https://old.reddit.com|')
-else
-    old_url="$url"
-fi
-
-# over18=1 skips the NSFW age-gate interstitial, which has no post data
-page=$(curl -fsSL -A "$ua" -e "https://old.reddit.com/" -b "over18=1" "$old_url")
-
-# Extract title from og:title — deterministic, one per HTML document.
-# macOS grep has no -P, so use -E and finish the extraction with sed; the
-# || true keeps a no-match grep from tripping errexit before our own checks.
-title=$(echo "$page" | grep -oE 'property="og:title"[^>]*content="[^"]*"' | head -1 | sed 's/.*content="//;s/"$//' | unescape || true)
-
-if [ -z "$title" ]; then
-    echo "Could not extract post title" >&2
+if ! command -v jq >/dev/null 2>&1; then
+    echo "jq is required" >&2
     exit 1
 fi
+
+url="$1"
+ua="Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
 
 post_id=$(echo "$url" | sed -n 's|.*/comments/\([a-zA-Z0-9]*\).*|\1|p')
 
@@ -46,22 +23,74 @@ if [ -z "$post_id" ]; then
     exit 1
 fi
 
-# Extract image URL from data-url attribute on the post element
-# This is the original uploaded image, deterministic per post
-img_url=$(echo "$page" | grep -oE "id=\"thing_t3_${post_id}\"[^>]*data-url=\"[^\"]*\"" | head -1 | sed 's/.*data-url="//;s/"$//' || true)
+# Reddit's HTML is JS-rendered and old.reddit.com now bounces logged-out
+# clients to a login wall, so go through the JSON API instead. raw_json=1
+# keeps HTML entities out of the values.
+json_url="https://www.reddit.com/comments/${post_id}.json?raw_json=1"
+page_url="https://www.reddit.com/comments/${post_id}/"
 
-if [ -z "$img_url" ]; then
-    # Fallback: the thumbnail anchor's href points at the full-size media
-    # (never the <img> src — that's a downscaled thumbnail)
-    img_url=$(echo "$page" | grep -oE '<a [^>]*>' | grep 'class="thumbnail' | head -1 | sed -n 's/.*href="\([^"]*\)".*/\1/p' || true)
+# Session cookies survive between runs, so the bot challenge below is
+# normally solved once rather than on every download
+jar="${XDG_CACHE_HOME:-$HOME/.cache}/reddl/cookies.txt"
+mkdir -p "$(dirname "$jar")"
+touch "$jar"
+chmod 600 "$jar"
+
+get() { curl -fsL -A "$ua" -b "$jar" -c "$jar" "$@"; }
+
+# Fresh clients get an interstitial whose only real work is echoing back a
+# doubled token; passing it is what mints the cookies the API accepts
+solve_challenge() {
+    local page tok sol
+    page=$(get "$page_url" || true)
+    tok=$(printf '%s' "$page" | sed -n 's/.*name="jsc_token" value="\([^"]*\)".*/\1/p' | head -1)
+    sol=$(printf '%s' "$page" | sed -n 's/.*(async e=>e+e)("\([^"]*\)").*/\1/p' | head -1)
+    [ -n "$tok" ] && [ -n "$sol" ] || return 1
+    get -o /dev/null -G \
+        --data-urlencode "solution=${sol}${sol}" \
+        --data-urlencode "jsc_token=$tok" \
+        -d "js_challenge=1" -d "jsc_orig_r=" \
+        "$page_url"
+}
+
+json=$(get "$json_url" || true)
+if ! echo "$json" | jq -e . >/dev/null 2>&1; then
+    solve_challenge || true
+    json=$(get "$json_url" || true)
 fi
+
+if ! echo "$json" | jq -e . >/dev/null 2>&1; then
+    echo "Could not fetch post data — Reddit blocked the request" >&2
+    exit 1
+fi
+
+post=$(echo "$json" | jq -c '.[0].data.children[0].data // empty')
+
+if [ -z "$post" ]; then
+    echo "Could not find post $post_id" >&2
+    exit 1
+fi
+
+if [ "$(echo "$post" | jq -r '.is_gallery // false')" = "true" ]; then
+    echo "Gallery posts are not supported: $url" >&2
+    exit 1
+fi
+
+title=$(echo "$post" | jq -r '.title // empty')
+
+if [ -z "$title" ]; then
+    echo "Could not extract post title" >&2
+    exit 1
+fi
+
+# url_overridden_by_dest is the link target; .url falls back to it for link
+# posts and holds the permalink for self posts, which the extension check rejects
+img_url=$(echo "$post" | jq -r '.url_overridden_by_dest // .url // empty')
 
 if [ -z "$img_url" ]; then
     echo "Could not find image URL for post" >&2
     exit 1
 fi
-
-img_url=$(echo "$img_url" | unescape)
 
 # preview.redd.it serves resized copies; the same path on i.redd.it is the
 # original upload, and the sizing/signature params don't apply over there
