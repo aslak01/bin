@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+if [[ -z "$1" || "$1" == -h || "$1" == --help ]]; then
+  echo "Usage: $(basename "$0") <path>..." >&2
+  echo "Copy files to the macOS clipboard, like cmd-C in Finder." >&2
+  echo "" >&2
+  echo "  Images also carry their pixel data, so they paste as a file" >&2
+  echo "  where a file is wanted and as an image where pixels are." >&2
+  exit 1
+fi
+
+paths=()
+for file in "$@"; do
+  if [[ ! -e "$file" ]]; then
+    echo "Error: '$file' not found" >&2
+    exit 1
+  fi
+  paths+=("$(realpath "$file")")
+done
+
+jxa=$(mktemp)
+trap 'rm -f "$jxa"' EXIT
+
+cat > "$jxa" <<'JXA'
+ObjC.import('AppKit');
+
+// Extensions whose bytes we can hand over under their own type, so apps that
+// prefer the original format get it untouched (an animated GIF stays animated).
+var UTI = {
+  png: 'public.png', jpg: 'public.jpeg', jpeg: 'public.jpeg', jpe: 'public.jpeg',
+  gif: 'com.compuserve.gif', tif: 'public.tiff', tiff: 'public.tiff',
+  bmp: 'com.microsoft.bmp', heic: 'public.heic', heif: 'public.heif',
+  webp: 'org.webmproject.webp', avif: 'public.avif', ico: 'com.microsoft.ico',
+  jp2: 'public.jpeg-2000', psd: 'com.adobe.photoshop-image',
+  tga: 'com.truevision.tga-image'
+};
+
+// Everything else we still try to decode into TIFF/PNG. Deliberately no PDF or
+// SVG: NSImage would happily rasterize those, but Finder treats them as files.
+var RASTER = Object.keys(UTI).concat(['dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2']);
+
+function extensionOf(path) {
+  var name = path.split('/').pop();
+  return name.indexOf('.') === -1 ? '' : name.split('.').pop().toLowerCase();
+}
+
+function decode(path) {
+  try {
+    var img = $.NSImage.alloc.initWithContentsOfFile(path);
+    return img && img.isValid ? img : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function pngFrom(tiff) {
+  try {
+    var rep = $.NSBitmapImageRep.imageRepWithData(tiff);
+    return rep ? rep.representationUsingTypeProperties(4 /* PNG */, $()) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Image types go on first so an app walking the item's types in order lands on
+// pixels; file-oriented apps ask for public.file-url by name and still find it.
+function itemFor(path) {
+  var item = $.NSPasteboardItem.alloc.init;
+  var ext = extensionOf(path);
+
+  if (RASTER.indexOf(ext) !== -1) {
+    var img = decode(path);
+    if (img) {
+      if (UTI[ext]) {
+        var raw = $.NSData.dataWithContentsOfFile(path);
+        if (raw && raw.length) item.setDataForType(raw, UTI[ext]);
+      }
+      var tiff = img.TIFFRepresentation;
+      if (tiff && tiff.length) {
+        var png = pngFrom(tiff);
+        if (png && png.length) item.setDataForType(png, 'public.png');
+        item.setDataForType(tiff, 'public.tiff');
+      }
+    }
+  }
+
+  item.setStringForType($.NSURL.fileURLWithPath(path).absoluteString, 'public.file-url');
+  return item;
+}
+
+function run(argv) {
+  var items = argv.map(itemFor);
+  var pb = $.NSPasteboard.generalPasteboard;
+  pb.clearContents;
+  return pb.writeObjects(items) ? 'ok' : 'failed';
+}
+JXA
+
+if [[ "$(osascript -l JavaScript "$jxa" "${paths[@]}")" != ok ]]; then
+  echo "Error: could not write to the clipboard" >&2
+  exit 1
+fi
+
+if [ ${#paths[@]} -eq 1 ]; then
+  echo "✓ Copied to clipboard: ${paths[0]}"
+else
+  echo "✓ Copied ${#paths[@]} files to clipboard"
+fi
