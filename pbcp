@@ -64,7 +64,7 @@ function pngFrom(tiff) {
 
 // Image types go on first so an app walking the item's types in order lands on
 // pixels; file-oriented apps ask for public.file-url by name and still find it.
-function itemFor(path, allPaths) {
+function itemFor(path) {
   var item = $.NSPasteboardItem.alloc.init;
   var ext = extensionOf(path);
 
@@ -88,11 +88,9 @@ function itemFor(path, allPaths) {
     }
   }
 
+  // AppKit synthesizes the legacy NSFilenamesPboardType flavor from this one for
+  // apps that still ask for it, so there is nothing else to write.
   item.setStringForType($.NSURL.fileURLWithPath(path).absoluteString, 'public.file-url');
-
-  // Apps that only know the pre-10.6 flavor (Chromium/Electron among them) read
-  // it off the first item, as a plist of every path in the copy.
-  if (allPaths) item.setPropertyListForType($(allPaths), 'NSFilenamesPboardType');
 
   return item;
 }
@@ -101,8 +99,8 @@ function run(argv) {
   // An ObjC object put in a plain JS array is deep-unwrapped into an
   // NSDictionary on the way across the bridge, so collect items in an NSArray.
   var items = $.NSMutableArray.alloc.init;
-  argv.forEach(function (path, i) {
-    items.addObject(itemFor(path, i === 0 ? argv : null));
+  argv.forEach(function (path) {
+    items.addObject(itemFor(path));
   });
 
   var pb = $.NSPasteboard.generalPasteboard;
